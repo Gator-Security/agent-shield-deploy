@@ -1,0 +1,140 @@
+{{- /*
+One Service + Deployment (+ optional PVC) per entry in .Values.services. Env + topology
+mirror each service's documented env contract. Probes are
+httpGet ONLY — the images are distroless (no shell for exec probes).
+Secret env is ALWAYS a secretKeyRef into .Values.existingSecret; the chart renders no
+secret material under any values input.
+*/ -}}
+{{- range $name, $svc := .Values.services }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels: {{- include "agent-shield.labels" $ | nindent 4 }}
+spec:
+  selector:
+    app: {{ $name }}
+  ports:
+    - port: {{ $svc.port }}
+      targetPort: {{ $svc.port }}
+{{- if $svc.pvc }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $name }}-data
+  labels: {{- include "agent-shield.labels" $ | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {{ $svc.pvc.size | default "1Gi" }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels: {{- include "agent-shield.labels" $ | nindent 4 }}
+spec:
+  replicas: {{ $svc.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+        {{- include "agent-shield.labels" $ | nindent 8 }}
+    spec:
+      # Do NOT inject the legacy Kubernetes service-link env vars (e.g. REGISTRY_PORT=
+      # tcp://<ip>:8085). Services here read env vars like REGISTRY_PORT/PORT as their own
+      # config, and the injected values shadow them and crash the process on boot.
+      enableServiceLinks: false
+      # The service images are distroless and run non-root; ENFORCE it so a mutated or
+      # replaced image running as root is rejected by the platform, not just unexpected.
+      # fsGroup makes mounted volumes (the /data PVCs and the console-key secret) group-owned
+      # by, and readable/writable to, the non-root runtime user — without it the pods cannot
+      # read their mounted key or write their WAL/outbox on the root-owned volume.
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: {{ $svc.fsGroup | default 65532 }}
+      containers:
+        - name: {{ $name }}
+          image: "{{ $.Values.imagePrefix }}/{{ $svc.image }}:{{ $.Values.tag }}"
+          imagePullPolicy: {{ $.Values.imagePullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+          env:
+            {{- range $k, $v := $svc.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+            {{- range $envName, $secretKey := $svc.secretEnv }}
+            - name: {{ $envName }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.existingSecret }}
+                  key: {{ $secretKey }}
+            {{- end }}
+            {{- range $envName, $secretKey := $svc.optionalSecretEnv }}
+            - name: {{ $envName }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.existingSecret }}
+                  key: {{ $secretKey }}
+                  optional: true
+            {{- end }}
+          ports:
+            - containerPort: {{ $svc.port }}
+          readinessProbe:
+            httpGet:
+              path: {{ $svc.probePath }}
+              port: {{ $svc.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          {{- if $svc.livenessPath }}
+          livenessProbe:
+            httpGet:
+              path: {{ $svc.livenessPath }}
+              port: {{ $svc.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          {{- end }}
+          {{- if or $svc.pvc $svc.fileSecretMounts }}
+          volumeMounts:
+            {{- if $svc.pvc }}
+            - name: data
+              mountPath: /data
+            {{- end }}
+            {{- /* Mount individual keys from existingSecret as read-only files. Used to inject
+                   a pre-provisioned signing key (e.g. C04's console-identity key) so the plane
+                   comes up deterministically without a first-boot key-generation round trip. The
+                   secret material still never travels through values — only the KEY NAME does. */ -}}
+            {{- range $i, $m := $svc.fileSecretMounts }}
+            - name: {{ printf "filesecret-%d" $i }}
+              mountPath: {{ $m.mountPath }}
+              readOnly: true
+            {{- end }}
+          {{- end }}
+      {{- if or $svc.pvc $svc.fileSecretMounts }}
+      volumes:
+        {{- if $svc.pvc }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ $name }}-data
+        {{- end }}
+        {{- range $i, $m := $svc.fileSecretMounts }}
+        - name: {{ printf "filesecret-%d" $i }}
+          secret:
+            secretName: {{ $.Values.existingSecret }}
+            items:
+              - key: {{ $m.secretKey }}
+                path: {{ $m.fileName }}
+            # 0440: owner+group read. With the pod fsGroup the non-root runtime user is in the
+            # volume's group, so it can read the key; still never writable, still in-pod only.
+            defaultMode: 0440
+        {{- end }}
+      {{- end }}
+{{- end }}

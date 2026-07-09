@@ -1,0 +1,40 @@
+# Copy to terraform.tfvars and adjust. Every value here has a sensible default in
+# variables.tf — a bare `terraform apply` with valid AWS credentials works out of the box.
+
+region      = "us-east-2"
+# aws_profile = "my-profile"   # omit to use the default AWS credential chain
+
+name_prefix = "agent-shield"
+namespace   = "agent-shield"
+
+# ── Node sizing ──
+node_instance_type = "t3.large"
+node_desired_size  = 2
+
+# ── RDS ──
+db_instance_class = "db.t3.small"
+db_multi_az       = false # set true for production audit-ledger durability
+
+# ── First console login (strongly recommended — without it a fresh install has no user) ──
+# Generate the hash with: python3 ../../scripts/make_admin_hash.py  (needs: pip install argon2-cffi)
+# The password itself never enters Terraform state — hash only.
+bootstrap_admin_email = "admin@example.com"
+# bootstrap_admin_password_hash = "$argon2id$v=19$m=65536,t=3,p=4$..."
+
+# ── Images ──
+# BEFORE apply: mirror the images into YOUR ECR (scripts/mirror_images.sh <region> <account> 0.1.0).
+# Your Agent Shield contact must first grant your account read-only pull access.
+# Defaults to THIS account's ECR in `region`. Override to pull from a shared registry.
+# image_registry    = "123456789012.dkr.ecr.us-east-2.amazonaws.com"
+image_repo_prefix = "agent-shield"
+image_tag         = "0.1.0"
+
+# ── Configuration profile ──
+# baseline (default) = fail-closed minimum. fedgov-cac = CAC/PIV via your OIDC IdP
+# (replace the placeholders in profiles/fedgov-cac.yaml first; see docs/cac-piv-integration.md).
+config_profile = "baseline"
+
+# ── TLS ──
+# Strongly recommended for production: an ACM cert in `region` for your console domain.
+# Empty = HTTP-only ALB (fine for a smoke test, NEVER for production).
+# acm_certificate_arn = "arn:aws:acm:us-east-2:123456789012:certificate/xxxxxxxx"

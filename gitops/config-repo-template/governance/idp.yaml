@@ -1,0 +1,9 @@
+# Human-SSO IdP settings — identifiers ONLY, never credentials (the OIDC client secret
+# lives in the cluster Secret gf-secrets / your secret manager).
+# These mirror the GF_HUMAN_OIDC_* values in the chart profile; keeping them here makes the
+# IdP configuration itself PR-reviewed.
+oidc:
+  issuer: "https://REPLACE-idp.example.gov/realms/agency"
+  client_id: "agent-shield-console"
+  role_claim: "roles"
+  tenant_claim: "tenant_id"

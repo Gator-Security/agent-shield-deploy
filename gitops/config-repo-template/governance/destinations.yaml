@@ -1,0 +1,8 @@
+# Egress destinations allowlist — the reviewed source of truth for where agents may send
+# data. NO secrets here. Applied by config-sync (roadmap); every change requires
+# security-team review via CODEOWNERS.
+destinations: []
+# Example:
+#   - name: corporate-siem
+#     url: https://siem.example.gov/ingest
+#     purpose: audit export

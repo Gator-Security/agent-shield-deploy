@@ -1,0 +1,45 @@
+# fedgov-cac — government / regulated deployments authenticating humans with CAC/PIV
+# smartcards. SELF-CONTAINED: includes the baseline settings, so apply just this one file.
+#
+# Architecture (see docs/cac-piv-integration.md for the full walkthrough):
+#   CAC/PIV smartcard ──x509──> your CAC-capable IdP (Keycloak x509 flow / Okta Smart Card /
+#   ADFS certificate auth) ──OIDC──> C04 identity ──C04-signed console token──> management API
+#
+# The smartcard/DoD-PKI complexity (trust chain, CRL/OCSP revocation, certificate policy
+# OIDs) stays in the IdP, which is already accredited for it. Agent Shield consumes standard
+# OIDC claims — so this profile is configuration, not custom certificate code.
+#
+# REQUIRED before install:
+#   1. Replace the GF_HUMAN_OIDC_* placeholders below with your IdP's values.
+#   2. Put the OIDC client secret in the pre-created Secret (existingSecret) under the key
+#      GF_HUMAN_OIDC_CLIENT_SECRET — secrets never travel through values files.
+#   3. Infrastructure (outside the chart): internal-facing ingress (Terraform
+#      `ingress_scheme = "internal"`), TLS via `acm_certificate_arn`, and review the FIPS
+#      checklist in docs/cac-piv-integration.md.
+
+services:
+  # ── baseline settings (duplicated so this profile stands alone) ──
+  pep:
+    env:
+      GF_FAIL_MODE: "closed"
+  management:
+    env:
+      MGMT_CORS_ORIGINS: ""
+
+  # ── CAC/PIV via the customer's OIDC IdP ──
+  identity:
+    env:
+      # Your CAC-capable IdP's issuer + JWKS. PLACEHOLDERS — the install must replace these.
+      GF_HUMAN_OIDC_ISSUER: "https://REPLACE-idp.example.gov/realms/agency"
+      GF_HUMAN_OIDC_JWKS_URI: "https://REPLACE-idp.example.gov/realms/agency/protocol/openid-connect/certs"
+      GF_HUMAN_OIDC_CLIENT_ID: "agent-shield-console"
+      # (the client SECRET is deliberately absent from env — it flows only through the
+      # secretKeyRef below; the chart's base values carry no plain-env credential either)
+      # Claim names C04 maps to Agent Shield roles/tenancy. Configure your IdP to emit them
+      # (e.g. a Keycloak protocol mapper from group membership); values here must match.
+      GF_HUMAN_OIDC_ROLE_CLAIM: "roles"
+      GF_HUMAN_OIDC_TENANT_CLAIM: "tenant_id"
+    secretEnv:
+      # Fail-closed on purpose: the pod refuses to start until the key exists in the Secret,
+      # so a CAC install can never silently boot without its IdP client credential.
+      GF_HUMAN_OIDC_CLIENT_SECRET: GF_HUMAN_OIDC_CLIENT_SECRET

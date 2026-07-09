@@ -1,0 +1,22 @@
+# Terraform state holds generated secret material IN PLAINTEXT — the console signing seed, the
+# RDS password, and every admin/writer token. It must NEVER be committed. Use an encrypted
+# remote backend (S3 + SSE-KMS + DynamoDB lock) for any shared/persistent use.
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Saved plans embed the same secret values as the state.
+*.tfplan
+tfplan*
+*.tfplan.*
+
+# Real variable files may carry secrets/ARNs; keep only the *.example.
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
+# Provider/module cache + crash logs.
+.terraform/
+.terraform.lock.hcl
+crash.log
+crash.*.log

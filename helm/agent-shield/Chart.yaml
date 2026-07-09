@@ -1,0 +1,11 @@
+apiVersion: v2
+name: agent-shield
+description: >-
+  Agent Shield AI-governance control plane — umbrella chart for the full plane
+  (audit store, PDP, PEP, registry, identity, compliance, egress, management API, console).
+  Secrets are NEVER set through values: the chart consumes a pre-existing Secret
+  (values.existingSecret), created by you or an operator such as External Secrets.
+type: application
+version: 0.1.0
+appVersion: "v1"
+keywords: [ai-governance, policy, audit, compliance]

@@ -1,0 +1,57 @@
+Agent Shield control plane installed.
+
+The golden path from here:
+
+1. If you have not already, create the Secret this release consumes (it was NOT created
+   by the chart — secrets never travel through values):
+
+     kubectl -n {{ .Release.Namespace }} create secret generic {{ .Values.existingSecret }} \
+       --from-literal=POSTGRES_PASSWORD=... \
+       --from-literal=AUDIT_DATABASE_URL='postgresql+psycopg://{{ .Values.config.postgresUser }}:...@db:5432/{{ .Values.config.postgresDb }}' \
+       --from-literal=AUDIT_SIGNING_MASTER_KEY="$(openssl rand -base64 48)" \
+       --from-literal=GF_ADMIN_TOKEN="$(openssl rand -hex 32)" \
+       --from-literal=GF_AUDITOR_TOKEN="$(openssl rand -hex 32)" \
+       --from-literal=GF_AUDIT_WRITER_TOKEN="$(openssl rand -hex 32)" \
+       --from-literal=GF_REGISTRY_WRITER_TOKEN="$(openssl rand -hex 32)" \
+       --from-literal=REGISTRY_TRUSTED_CODE_HASHES="" \
+       --from-literal=GF_IDENTITY_CONSOLE_PUBKEY="$(kubectl -n {{ .Release.Namespace }} exec deploy/identity -- \
+           curl -s http://localhost:8084/v1/keys/console | jq -r .public_key_pem)"
+
+   GF_AUDIT_WRITER_TOKEN is REQUIRED: audit runs AUDIT_STORE_ENV=production, so it crash-loops
+   without it (fail-safe — the ledger never boots accepting unauthenticated writes).
+   GF_REGISTRY_WRITER_TOKEN is REQUIRED the same way: registry runs
+   REGISTRY_ENV=production, so it crash-loops without it — the enroll/discovery write
+   surface never boots open. Workloads that enroll or post discovery observations send
+   it as the X-Registry-Token header.
+   GF_IDENTITY_CONSOLE_PUBKEY is REQUIRED: management runs GF_ENV=production, so it
+   refuses to start without the console-identity public key it uses to VALIDATE browser tokens.
+   It is C04's DEDICATED console key (GET /v1/keys/console), not the workload-token key; C04
+   generates + persists the private half on its data volume on first boot.
+
+   SECURITY: NEVER expose the management API (:8090) to the public internet without the
+   auth gateway. Browsers reach ONLY the console origin (the UI/BFF), which holds the session and
+   attaches a short-lived C04-signed identity token to each management-plane call. The Ingress
+   below routes only the console origin publicly; :8090 stays cluster-internal. A management API
+   reached directly without a valid token fails closed (401/403) — but do not rely on that as the
+   only wall: keep :8090 off the public internet.
+
+   (Prefer External Secrets Operator + your secret manager in production.)
+
+2. Reach the console:
+
+     kubectl -n {{ .Release.Namespace }} port-forward svc/ui 3000:3000
+     kubectl -n {{ .Release.Namespace }} port-forward svc/management 8090:8090
+
+   then open http://localhost:3000 and follow the "Getting started" checklist —
+   (the chart allows this cross-origin call via MGMT_CORS_ORIGINS=http://localhost:3000;
+   override services.management.env.MGMT_CORS_ORIGINS for a hosted console origin) —
+   it walks you through enrolling your first agent, enabling starter policy packs,
+   wiring alerting/SIEM, and verifying a live decision.
+
+3. Configuration as code: export the current state and keep it in your repo,
+   then apply changes declaratively (dry-run first):
+
+     GET  /api/config/export
+     POST /api/config/apply {"document": ..., "dry_run": true}
+
+   Starter documents live in gitops/config-repo-template/governance/.

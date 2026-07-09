@@ -1,0 +1,6 @@
+# Deployment config: platform/ops team reviews.
+/clusters/  @YOUR-ORG/platform-team
+/charts/    @YOUR-ORG/platform-team
+
+# Governance config: security owners MUST review — merging = approving the policy change.
+/governance/  @YOUR-ORG/security-team

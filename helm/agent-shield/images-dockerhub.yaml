@@ -1,0 +1,27 @@
+# Image map for Docker Hub pulls (docker.io). Docker Hub has NO nested repositories, so the
+# images are published flat as <namespace>/agent-shield-<svc> by your Agent Shield contact.
+# Layer this file when installing from Docker Hub:
+#   helm ... -f images-dockerhub.yaml [-f profiles/baseline.yaml] ...
+# (with Terraform, pass it via chart values or keep the default ECR path instead)
+imagePrefix: docker.io/g8rsecurity
+tag: "0.1.0"
+
+services:
+  audit:
+    image: agent-shield-audit-store
+  pdp:
+    image: agent-shield-pdp
+  registry:
+    image: agent-shield-registry
+  identity:
+    image: agent-shield-identity
+  compliance:
+    image: agent-shield-compliance
+  egress:
+    image: agent-shield-egress
+  pep:
+    image: agent-shield-pep
+  management:
+    image: agent-shield-management-api
+  ui:
+    image: agent-shield-ui

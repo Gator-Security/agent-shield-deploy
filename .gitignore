@@ -1,0 +1,15 @@
+# Terraform: state holds generated secret material — NEVER commit it.
+**/*.tfstate
+**/*.tfstate.*
+**/tfplan*
+**/.terraform/
+**/.terraform.lock.hcl
+
+# Real var/secret files — keep only the *.example.
+**/*.tfvars
+!**/*.tfvars.example
+**/secrets.env
+!**/secrets.env.example
+
+# OS / editor cruft
+.DS_Store

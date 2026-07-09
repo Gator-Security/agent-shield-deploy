@@ -1,0 +1,11 @@
+# Your cluster-specific overrides. Layered LAST (wins per-key) over the chart defaults and
+# the selected profile — keep it minimal: only what differs for this cluster.
+
+# Your registry + the release tag you are pinning (never `latest` in production).
+imagePrefix: "REPLACE.dkr.ecr.us-east-2.amazonaws.com/agent-shield"
+tag: "0.1.0"
+
+# Example scaling override:
+# services:
+#   management:
+#     replicas: 3

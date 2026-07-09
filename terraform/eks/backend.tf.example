@@ -1,0 +1,19 @@
+# REMOTE STATE — strongly recommended before real use.
+#
+# Terraform state for this module contains SECRET MATERIAL in plaintext: the console-identity
+# signing seed, the RDS password, and every admin/writer token. The default local backend
+# leaves that in terraform.tfstate on the apply host (gitignored here, but unencrypted).
+#
+# Copy this file to backend.tf, fill in your bucket/table, then `terraform init -migrate-state`.
+# The bucket MUST have SSE-KMS encryption + versioning; the DynamoDB table provides locking.
+#
+# terraform {
+#   backend "s3" {
+#     bucket         = "YOUR-tfstate-bucket"        # SSE-KMS + versioning enabled
+#     key            = "agent-shield/eks/terraform.tfstate"
+#     region         = "us-east-2"
+#     dynamodb_table = "YOUR-tflock-table"          # partition key: LockID (String)
+#     encrypt        = true
+#     kms_key_id     = "arn:aws:kms:...:key/..."    # optional: a CMK instead of the AWS-managed key
+#   }
+# }

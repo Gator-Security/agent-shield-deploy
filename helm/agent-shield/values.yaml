@@ -1,0 +1,208 @@
+# Agent Shield umbrella chart values.
+#
+# SECRETS POSTURE (non-negotiable): this chart NEVER accepts secret material via values.
+# Create the Secret named by `existingSecret` yourself (kubectl / External Secrets / your
+# secret manager) with the keys listed in helm/agent-shield/secrets.env.example:
+#   AUDIT_DATABASE_URL, POSTGRES_PASSWORD, AUDIT_SIGNING_MASTER_KEY,
+#   REGISTRY_TRUSTED_CODE_HASHES, GF_ADMIN_TOKEN, GF_AUDITOR_TOKEN,
+#   GF_IDENTITY_CONSOLE_PUBKEY (management-api pins it to validate browser tokens)
+# Every consumer below references those keys via secretKeyRef — values.yaml holds names only.
+
+imagePrefix: your-registry.example.com/agent-shield
+tag: v1
+imagePullPolicy: IfNotPresent
+existingSecret: gf-secrets
+
+# Non-secret shared config (must match the credentials inside AUDIT_DATABASE_URL).
+config:
+  postgresUser: gov
+  postgresDb: governed
+
+# Bundled Postgres for the C01 store. For a managed DB (RDS/Cloud SQL) set enabled: false
+# and point AUDIT_DATABASE_URL (in the Secret) at it.
+postgres:
+  enabled: true
+  image: postgres:16-alpine
+  storage: 10Gi
+
+# One-shot alembic migration Job for the audit store schema.
+migration:
+  enabled: true
+
+# The control-plane services. Per-service: image (suffix under imagePrefix), port,
+# probePath (distroless images -> httpGet probes only, never exec), replicas, optional
+# PVC (name mounted at /data), static env, and secretEnv (ENV_NAME -> key in existingSecret).
+services:
+  audit:
+    image: audit-store
+    port: 8080
+    replicas: 1
+    probePath: /readyz
+    livenessPath: /healthz
+    env:
+      # production posture — the startup guard REQUIRES GF_AUDIT_WRITER_TOKEN unless this
+      # is an explicit dev value, so the ledger can never boot accepting unauthenticated writes.
+      AUDIT_STORE_ENV: production
+    secretEnv:
+      DATABASE_URL: AUDIT_DATABASE_URL
+      AUDIT_SIGNING_MASTER_KEY: AUDIT_SIGNING_MASTER_KEY
+      GF_ADMIN_TOKEN: GF_ADMIN_TOKEN
+      GF_AUDIT_WRITER_TOKEN: GF_AUDIT_WRITER_TOKEN # C01 audit-ingest writer auth (producers present it)
+
+  pdp:
+    image: pdp
+    port: 8082
+    replicas: 1
+    probePath: /healthz
+    pvc: { size: 1Gi }
+    env:
+      PDP_PORT: "8082"
+      AUDIT_STORE_URL: http://audit:8080
+      PDP_KILL_STORE_PATH: /data/kill.json
+    secretEnv:
+      GF_ADMIN_TOKEN: GF_ADMIN_TOKEN
+      GF_AUDIT_WRITER_TOKEN: GF_AUDIT_WRITER_TOKEN # C01 audit-ingest writer auth (producers present it)
+
+  registry:
+    image: registry
+    port: 8085
+    replicas: 1
+    probePath: /health
+    pvc: { size: 1Gi }
+    env:
+      PORT: "8085"
+      REGISTRY_DB_PATH: /data/registry.db
+      AUDIT_STORE_URL: http://audit:8080
+      IDENTITY_URL: http://identity:8084
+      # production posture — the startup guard REQUIRES GF_REGISTRY_WRITER_TOKEN unless
+      # this is an explicit dev value, so enroll/discovery writes can never boot open.
+      REGISTRY_ENV: production
+    secretEnv:
+      REGISTRY_TRUSTED_CODE_HASHES: REGISTRY_TRUSTED_CODE_HASHES
+      GF_ADMIN_TOKEN: GF_ADMIN_TOKEN
+      GF_AUDIT_WRITER_TOKEN: GF_AUDIT_WRITER_TOKEN # C01 audit-ingest writer auth (producers present it)
+      GF_REGISTRY_WRITER_TOKEN: GF_REGISTRY_WRITER_TOKEN # C05 enroll/discovery write auth (producers present X-Registry-Token)
+
+  identity:
+    image: identity
+    port: 8084
+    replicas: 1
+    probePath: /health
+    pvc: { size: 1Gi }
+    env:
+      PORT: "8084"
+      GF_IDENTITY_DATA_DIR: /data
+      # DEDICATED console-identity signing key (separate blast radius from the workload
+      # key). C04 signs short-lived browser identity tokens with this; the management-api pins the
+      # matching public key. Persisted on the identity volume so tokens verify across restarts;
+      # generated on first boot if absent. Production preflight requires it set.
+      GF_CONSOLE_SIGNING_KEY_PATH: /data/console-signing.key
+      GF_HUMAN_OIDC_ISSUER: ""
+      GF_HUMAN_OIDC_JWKS_URI: ""
+      GF_HUMAN_OIDC_CLIENT_ID: ""
+      # NOTE: the OIDC CLIENT SECRET is deliberately NOT here — a credential must never be a
+      # plain env literal (helm_guard enforces it). SSO installs map it via secretEnv to the
+      # GF_HUMAN_OIDC_CLIENT_SECRET key in existingSecret — see profiles/fedgov-cac.yaml.
+      GF_HUMAN_OIDC_ROLE_CLAIM: "roles"
+      GF_HUMAN_OIDC_TENANT_CLAIM: "tenant_id"
+    secretEnv:
+      # Cross-instance jti replay store (required before scaling identity past 1 replica).
+      GF_IDENTITY_REPLAY_DSN: AUDIT_DATABASE_URL
+
+  compliance:
+    image: compliance
+    port: 8086
+    replicas: 1
+    probePath: /healthz
+    pvc: { size: 1Gi }
+    env:
+      AUDIT_STORE_URL: http://audit:8080
+      REGISTRY_URL: http://registry:8085
+      COMPLIANCE_SIGNING_KEY_PATH: /data/compliance-signing-key.pem
+      COMPLIANCE_ARTIFACT_ROOT: /data
+    secretEnv:
+      GF_AUDITOR_TOKEN: GF_AUDITOR_TOKEN
+      GF_ADMIN_TOKEN: GF_ADMIN_TOKEN
+      GF_AUDIT_WRITER_TOKEN: GF_AUDIT_WRITER_TOKEN # C01 audit-ingest writer auth (producers present it)
+
+  egress:
+    image: egress
+    port: 8087
+    replicas: 1
+    probePath: /healthz
+    pvc: { size: 1Gi }
+    env:
+      EGRESS_PORT: "8087"
+      EGRESS_ALLOW_PRIVATE_DESTINATIONS: "false"
+      EGRESS_C01_CURSOR_PATH: /data/c01-cursor.json
+      EGRESS_OUTBOX_PATH: /data/dispatch-outbox.jsonl
+      EGRESS_DESTINATIONS_PATH: /data/destinations.json
+
+  pep:
+    image: pep
+    port: 8083
+    replicas: 1
+    probePath: /health
+    pvc: { size: 1Gi }
+    env:
+      GF_PDP_ENDPOINT: http://pdp:8082/v1/decide
+      GF_AUDIT_ENDPOINT: http://audit:8080/v1/audit/events
+      GF_DECISION_SIGNING_KEY_PATH: /data/pep-signing-key.bin
+      GF_AUDIT_WAL_PATH: /data/audit.wal
+    secretEnv:
+      GF_ADMIN_TOKEN: GF_ADMIN_TOKEN
+      GF_AUDIT_WRITER_TOKEN: GF_AUDIT_WRITER_TOKEN # C01 audit-ingest writer auth (producers present it)
+
+  management:
+    image: management-api
+    port: 8090
+    replicas: 2
+    probePath: /healthz
+    env:
+      MGMT_PORT: "8090"
+      AUDIT_STORE_URL: http://audit:8080
+      PDP_URL: http://pdp:8082
+      REGISTRY_URL: http://registry:8085
+      COMPLIANCE_URL: http://compliance:8086
+      # Upstreams for custom roles and SIEM export.
+      IDENTITY_URL: http://identity:8084
+      EGRESS_URL: http://egress:8087
+      # The console calls this API cross-origin under the NOTES.txt port-forward golden
+      # path (ui :3000 -> management :8090). Localhost-only by default; override with your
+      # real console origin (comma-separated) or empty to disable CORS entirely.
+      MGMT_CORS_ORIGINS: http://localhost:3000
+      # Browser auth. GF_ENV=production arms the gateway's fail-closed boot guard:
+      # it validates C04-signed console identity tokens and derives the caller ONLY from the token
+      # (no X-GF-Roles trust), refusing to start without the pinned console pubkey below. NEVER
+      # expose :8090 publicly — browsers reach only the console origin (the BFF), which attaches the
+      # token; direct :8090 reach without a valid token fails closed (401/403).
+      GF_ENV: production
+    secretEnv:
+      GF_AUDITOR_TOKEN: GF_AUDITOR_TOKEN
+      # Presented on admin-guarded upstream hops (policy activate, packs, groups). Without
+      # it those routes fail closed (503).
+      GF_ADMIN_TOKEN: GF_ADMIN_TOKEN
+      GF_AUDIT_WRITER_TOKEN: GF_AUDIT_WRITER_TOKEN # C01 audit-ingest writer auth (producers present it)
+      # The console-identity PUBLIC key (Ed25519 PEM) the gateway pins to VALIDATE
+      # tokens. Required: with GF_ENV=production the pod refuses to start without it. Populate the
+      # gf-secrets key from C04's GET /v1/keys/console (.public_key_pem).
+      GF_IDENTITY_CONSOLE_PUBKEY: GF_IDENTITY_CONSOLE_PUBKEY
+    # Optional (pod still starts if the key is absent from the Secret): signing key for
+    # notification action-tokens (ack/approve links). Without it those links fail
+    # closed at validation.
+    optionalSecretEnv:
+      GF_ACTION_TOKEN_SECRET: GF_ACTION_TOKEN_SECRET
+
+  ui:
+    image: ui
+    port: 3000
+    replicas: 2
+    probePath: /
+    env:
+      PORT: "3000"
+      NEXT_PUBLIC_USE_BFF: "true"
+      NEXT_PUBLIC_MANAGEMENT_API_URL: http://management:8090
+      # Server-side BFF upstreams for the Next.js /api/auth/* + /api/gf/* routes
+      # (getConsoleToken via IDENTITY_URL; proxyToManagementApi via MANAGEMENT_API_URL).
+      IDENTITY_URL: http://identity:8084
+      MANAGEMENT_API_URL: http://management:8090

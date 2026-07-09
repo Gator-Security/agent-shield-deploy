@@ -1,0 +1,25 @@
+# baseline — the minimum-secure install, for EVERY deployment.
+#
+# This turns the fail-closed checklist in docs/deployment-guide.md from prose an
+# operator can skip into config that ships applied. Layer it on the chart defaults:
+#   helm ... -f profiles/baseline.yaml
+#
+# It only sets values verified against docs/configuration-reference.md. Checklist
+# items a chart value cannot express (ALLOW_DEV_SEED unset, the egress-firewall chokepoint's
+# EGRESS_FAIL_OPEN=false, edge TLS) are documented in profiles/README.md.
+
+services:
+  pep:
+    env:
+      # Enforcement mode when the PDP is unreachable. `closed` = deny + durable audit buffer,
+      # never silent allow. The production guard expects this explicit in prod — make the
+      # posture visible in config, not an implicit default.
+      GF_FAIL_MODE: "closed"
+
+  management:
+    env:
+      # The console reaches the management plane exclusively through the UI's server-side BFF
+      # (NEXT_PUBLIC_USE_BFF=true in the chart defaults), so no browser ever calls :8090
+      # cross-origin. Empty disables CORS entirely — the tightest correct setting for the BFF
+      # golden path. Set your real console origin(s) ONLY if you deliberately bypass the BFF.
+      MGMT_CORS_ORIGINS: ""

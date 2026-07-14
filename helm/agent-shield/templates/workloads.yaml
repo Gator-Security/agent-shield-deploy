@@ -48,6 +48,13 @@ spec:
         app: {{ $name }}
         {{- include "agent-shield.labels" $ | nindent 8 }}
     spec:
+      # Private registry pull auth (ECR non-EKS, or private Docker Hub). Create the secret
+      # yourself (kubectl create secret docker-registry ...) and list it in .Values.imagePullSecrets.
+      # EKS + ECR can instead pull via the node role / IRSA and leave this empty.
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       # Do NOT inject the legacy Kubernetes service-link env vars (e.g. REGISTRY_PORT=
       # tcp://<ip>:8085). Services here read env vars like REGISTRY_PORT/PORT as their own
       # config, and the injected values shadow them and crash the process on boot.

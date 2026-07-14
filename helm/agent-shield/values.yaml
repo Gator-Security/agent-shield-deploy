@@ -11,6 +11,13 @@
 imagePrefix: your-registry.example.com/agent-shield
 tag: "0.1.0"
 imagePullPolicy: IfNotPresent
+# Pull secrets for private registries (private Docker Hub, or ECR on non-EKS clusters).
+# Create the secret yourself and reference it by name, e.g.:
+#   kubectl create secret docker-registry gf-pull --docker-server=<registry> \
+#     --docker-username=<user> --docker-password=<token>
+#   imagePullSecrets: [{ name: gf-pull }]
+# Leave empty for EKS + ECR (node role / IRSA handles pull).
+imagePullSecrets: []
 existingSecret: gf-secrets
 
 # Non-secret shared config (must match the credentials inside AUDIT_DATABASE_URL).

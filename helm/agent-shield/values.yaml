@@ -9,7 +9,7 @@
 # Every consumer below references those keys via secretKeyRef — values.yaml holds names only.
 
 imagePrefix: your-registry.example.com/agent-shield
-tag: v1
+tag: "0.1.0"
 imagePullPolicy: IfNotPresent
 existingSecret: gf-secrets
 

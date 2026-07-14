@@ -1,0 +1,37 @@
+# Image map for AWS ECR pulls. Unlike Docker Hub's flat layout
+# (<namespace>/agent-shield-<svc>), ECR uses NESTED repositories: <registry>/agent-shield/<svc>.
+#
+# Layer this file when installing from ECR:
+#   helm ... -f images-ecr.yaml [-f profiles/baseline.yaml] ...
+#
+# imagePrefix below is a PLACEHOLDER. Replace it with the ECR registry you were granted
+# pull access to — format: <account-id>.dkr.ecr.<region>.amazonaws.com/agent-shield
+# Your Agent Shield contact provides the exact account id + region.
+#
+# NOTE: pulling these images requires a cross-account ECR pull grant on your AWS account
+# (ecr:GetAuthorizationToken + BatchGetImage + GetDownloadUrlForLayer, via the repository
+# policy). Being able to render this chart does not by itself grant image pull — confirm the
+# grant with your Agent Shield contact. EKS clusters pull via the node role / IRSA; non-EKS
+# clusters need an imagePullSecret generated from `aws ecr get-login-password`.
+imagePrefix: <account-id>.dkr.ecr.<region>.amazonaws.com/agent-shield
+tag: "0.1.0"
+
+services:
+  audit:
+    image: audit-store
+  pdp:
+    image: pdp
+  registry:
+    image: registry
+  identity:
+    image: identity
+  compliance:
+    image: compliance
+  egress:
+    image: egress
+  pep:
+    image: pep
+  management:
+    image: management-api
+  ui:
+    image: ui

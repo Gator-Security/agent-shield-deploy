@@ -102,6 +102,20 @@ SSO/OIDC (including CAC/PIV via the `fedgov-cac` configuration profile) is a **m
 milestone, not a day-1 step** — plan it for week 1+ (section 6). Day 1 is email/password with
 the bootstrap admin.
 
+> **Installing the Helm chart directly (no Terraform)?** The bootstrap admin is not created
+> automatically — the Terraform module sets it for you, but a standalone `helm install` does not.
+> Before installing, generate the hash and add three keys to your `gf-secrets` Secret so the
+> identity pod picks them up (they map to the identity `optionalSecretEnv`):
+> ```bash
+> python3 scripts/make_admin_hash.py        # prompts for a password, prints the $argon2id$ hash
+> kubectl -n agent-shield create secret generic gf-secrets \
+>   --from-literal=GF_BOOTSTRAP_ADMIN_EMAIL='you@yourcompany.com' \
+>   --from-literal=GF_BOOTSTRAP_ADMIN_PASSWORD_HASH='$argon2id$v=19$...' \
+>   ...(the other gf-secrets keys)... --dry-run=client -o yaml | kubectl apply -f -
+> ```
+> Then `helm upgrade` / restart identity and log in as above. `GF_BOOTSTRAP_ADMIN_TENANT` is
+> optional (defaults to the platform tenant). See `helm/agent-shield/secrets.env.example`.
+
 ---
 
 ## 4. Protect the first agent

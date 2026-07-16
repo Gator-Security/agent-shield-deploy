@@ -115,6 +115,14 @@ services:
     secretEnv:
       # Cross-instance jti replay store (required before scaling identity past 1 replica).
       GF_IDENTITY_REPLAY_DSN: AUDIT_DATABASE_URL
+    optionalSecretEnv:
+      # First console login WITHOUT SSO: create a local platform_admin on boot (idempotent).
+      # Installing the chart directly (not via the Terraform module, which sets these for you):
+      # put these keys in existingSecret to bootstrap a login — hash from scripts/make_admin_hash.py.
+      # optional: true, so SSO installs may omit them. PASSWORD_HASH is an argon2id HASH, never plaintext.
+      GF_BOOTSTRAP_ADMIN_EMAIL: GF_BOOTSTRAP_ADMIN_EMAIL
+      GF_BOOTSTRAP_ADMIN_PASSWORD_HASH: GF_BOOTSTRAP_ADMIN_PASSWORD_HASH
+      GF_BOOTSTRAP_ADMIN_TENANT: GF_BOOTSTRAP_ADMIN_TENANT
 
   compliance:
     image: compliance

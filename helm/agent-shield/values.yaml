@@ -66,6 +66,12 @@ services:
       PDP_PORT: "8082"
       AUDIT_STORE_URL: http://audit:8080
       PDP_KILL_STORE_PATH: /data/kill.json
+      # Durable per-tenant resource-classification config (C02). Persisted on the PDP data volume so
+      # the sensitivity ruleset — which drives the pack's sensitivity-gated denies (lethal-trifecta,
+      # tool-exfil) — survives a pod restart; without this the store is in-memory and those denies go
+      # dark until an operator re-pushes. Single-replica store (replicas: 1), same as PDP_KILL_STORE_PATH;
+      # scaling PDP past 1 replica would need a shared store / reload-from-config-source.
+      GF_PDP_CLASSIFICATION_PATH: /data/classification.json
     secretEnv:
       GF_ADMIN_TOKEN: GF_ADMIN_TOKEN
       GF_AUDIT_WRITER_TOKEN: GF_AUDIT_WRITER_TOKEN # C01 audit-ingest writer auth (producers present it)

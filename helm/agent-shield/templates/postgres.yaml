@@ -81,7 +81,7 @@ spec:
         - name: migrate
           {{- /* Reuse the audit service's image NAME so registry maps that rename images
                  (e.g. Docker Hub's flat agent-shield-audit-store) cover the migration too. */}}
-          image: "{{ .Values.imagePrefix }}/{{ .Values.services.audit.image }}:{{ .Values.tag }}"
+          image: "{{ .Values.imagePrefix }}/{{ .Values.services.audit.image }}:{{ .Values.tag | default .Chart.AppVersion }}"
           command: ["alembic", "upgrade", "head"]
           env:
             - name: DATABASE_URL

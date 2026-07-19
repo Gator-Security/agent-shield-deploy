@@ -69,7 +69,7 @@ spec:
         fsGroup: {{ $svc.fsGroup | default 65532 }}
       containers:
         - name: {{ $name }}
-          image: "{{ $.Values.imagePrefix }}/{{ $svc.image }}:{{ $.Values.tag }}"
+          image: "{{ $.Values.imagePrefix }}/{{ $svc.image }}:{{ $.Values.tag | default $.Chart.AppVersion }}"
           imagePullPolicy: {{ $.Values.imagePullPolicy }}
           securityContext:
             allowPrivilegeEscalation: false

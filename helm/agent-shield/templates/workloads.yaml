@@ -74,6 +74,14 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
           env:
+            {{- /* Global log verbosity (.Values.logLevel) fans out to every service
+                   container as LOG_LEVEL. Precedence: a per-service env LOG_LEVEL
+                   (services.<name>.env.LOG_LEVEL) WINS — when the service sets its own,
+                   the global entry is skipped so the container carries exactly one. */ -}}
+            {{- if not (hasKey ($svc.env | default dict) "LOG_LEVEL") }}
+            - name: LOG_LEVEL
+              value: {{ $.Values.logLevel | quote }}
+            {{- end }}
             {{- range $k, $v := $svc.env }}
             - name: {{ $k }}
               value: {{ $v | quote }}

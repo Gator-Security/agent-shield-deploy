@@ -6,6 +6,6 @@ description: >-
   Secrets are NEVER set through values: the chart consumes a pre-existing Secret
   (values.existingSecret), created by you or an operator such as External Secrets.
 type: application
-version: 0.1.0
+version: 0.1.1
 appVersion: "v1"
 keywords: [ai-governance, policy, audit, compliance]

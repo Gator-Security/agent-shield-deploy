@@ -84,6 +84,11 @@ spec:
           image: "{{ .Values.imagePrefix }}/{{ .Values.services.audit.image }}:{{ .Values.tag }}"
           command: ["alembic", "upgrade", "head"]
           env:
+            # Same global log-verbosity fan-out as the service containers (this runs the
+            # audit service's image). The bundled Postgres deliberately does NOT get it —
+            # a stock image that doesn't read LOG_LEVEL.
+            - name: LOG_LEVEL
+              value: {{ .Values.logLevel | quote }}
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:

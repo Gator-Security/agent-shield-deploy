@@ -20,6 +20,12 @@ imagePullPolicy: IfNotPresent
 imagePullSecrets: []
 existingSecret: gf-secrets
 
+# Uniform log verbosity for the whole plane: debug|info|warn|error (services parse it
+# tolerantly). Fans out to EVERY service container as the LOG_LEVEL env var. Precedence:
+# a per-service env LOG_LEVEL (services.<name>.env.LOG_LEVEL), if set, WINS over this
+# global — the template skips the global entry for that container.
+logLevel: info
+
 # Non-secret shared config (must match the credentials inside AUDIT_DATABASE_URL).
 config:
   postgresUser: gov

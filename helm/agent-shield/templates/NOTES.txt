@@ -55,3 +55,10 @@ The golden path from here:
      POST /api/config/apply {"document": ..., "dry_run": true}
 
    Starter documents live in gitops/config-repo-template/governance/.
+
+4. Log verbosity: every service container gets LOG_LEVEL from the single chart value
+   `logLevel` (debug|info|warn|error, currently {{ .Values.logLevel }}), e.g.
+
+     helm upgrade <release> ... --reuse-values --set logLevel=debug
+
+   A per-service override (services.<name>.env.LOG_LEVEL) wins over the global.

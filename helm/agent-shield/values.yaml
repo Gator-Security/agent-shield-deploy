@@ -14,6 +14,11 @@ imagePrefix: your-registry.example.com/agent-shield
 # an overlay / gitops values) to pin a specific tag for an environment.
 tag: ""
 imagePullPolicy: IfNotPresent
+# Uniform log verbosity for the whole plane: debug|info|warn|error (services parse it
+# tolerantly). Fans out to EVERY service container as the LOG_LEVEL env var. Precedence:
+# a per-service env LOG_LEVEL (services.<name>.env.LOG_LEVEL), if set, WINS over this
+# global — the template skips the global entry for that container.
+logLevel: info
 # Pull secrets for private registries (private Docker Hub, or ECR on non-EKS clusters).
 # Create the secret yourself and reference it by name, e.g.:
 #   kubectl create secret docker-registry gf-pull --docker-server=<registry> \
@@ -121,6 +126,14 @@ services:
       # GF_HUMAN_OIDC_CLIENT_SECRET key in existingSecret — see profiles/fedgov-cac.yaml.
       GF_HUMAN_OIDC_ROLE_CLAIM: "roles"
       GF_HUMAN_OIDC_TENANT_CLAIM: "tenant_id"
+      # SPIFFE peer authentication for identity's workload-minting routes (token issue/revoke,
+      # attest-and-issue enrollment, role CRUD/assign) is NOT configured in this chart — it needs
+      # a SPIRE / service-mesh SVID (GF_SPIFFE_SVID_CERT/KEY/BUNDLE). Until then those routes run
+      # WITHOUT peer auth, so any in-cluster caller could mint or revoke tokens. identity fails
+      # those routes CLOSED (503) unless the gap is explicitly acknowledged — this flag is that
+      # acknowledgment, preserving the current (mesh-less) behavior while making the posture
+      # explicit here instead of silent. TODO(security): provision SPIFFE and remove this flag.
+      GF_SPIFFE_PEER_AUTH_OPTIONAL: "1"
     secretEnv:
       # Cross-instance jti replay store (required before scaling identity past 1 replica).
       GF_IDENTITY_REPLAY_DSN: AUDIT_DATABASE_URL

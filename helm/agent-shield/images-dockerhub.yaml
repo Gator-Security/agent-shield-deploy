@@ -4,7 +4,6 @@
 #   helm ... -f images-dockerhub.yaml [-f profiles/baseline.yaml] ...
 # (with Terraform, pass it via chart values or keep the default ECR path instead)
 imagePrefix: docker.io/g8rsecurity
-tag: "0.1.0"
 
 services:
   audit:

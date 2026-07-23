@@ -9,7 +9,10 @@
 # Every consumer below references those keys via secretKeyRef — values.yaml holds names only.
 
 imagePrefix: your-registry.example.com/agent-shield
-tag: "0.1.0"
+# Image tag. Empty = single-sourced from Chart.appVersion (the release version, which matches
+# the tag image-release.yml pushes), so a release bumps ONLY Chart.yaml. Set a value here (or in
+# an overlay / gitops values) to pin a specific tag for an environment.
+tag: ""
 imagePullPolicy: IfNotPresent
 # Pull secrets for private registries (private Docker Hub, or ECR on non-EKS clusters).
 # Create the secret yourself and reference it by name, e.g.:

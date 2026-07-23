@@ -14,7 +14,6 @@
 # grant with your Agent Shield contact. EKS clusters pull via the node role / IRSA; non-EKS
 # clusters need an imagePullSecret generated from `aws ecr get-login-password`.
 imagePrefix: <account-id>.dkr.ecr.<region>.amazonaws.com/agent-shield
-tag: "0.1.0"
 
 services:
   audit:

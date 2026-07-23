@@ -296,7 +296,9 @@ appears live.
   2. Logs for the affected service — one of `audit`, `pdp`, `registry`, `identity`,
      `compliance`, `egress`, `pep`, `management`, `ui`:
      `kubectl -n agent-shield logs deploy/<service> --tail=200` (add `--previous` for a
-     crash-looping pod)
+     crash-looping pod). Need more detail? Raise verbosity plane-wide with the single chart
+     value `logLevel` (`--set logLevel=debug`; debug|info|warn|error, default `info` — a
+     per-service `services.<name>.env.LOG_LEVEL` override wins), then re-collect.
   3. `terraform output` (no secrets in outputs) and your `image_tag`
   Never send us the contents of `gf-secrets` or your tfvars password hash.
 
